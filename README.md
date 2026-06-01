@@ -6,7 +6,7 @@ The first tool is a transparent position-size calculator that converts:
 
 - entry price
 - stop-loss price
-- risk amount in account currency
+- fixed risk amount, balance-percent risk, or equity-percent risk
 - broker symbol properties
 
 into a volume/lot size that is rounded down to the symbol's allowed volume step.
@@ -21,12 +21,57 @@ Manual lot calculation is error-prone, especially when trading different symbols
 
 ### `src/RiskLotCalculator.mq5`
 
-A MetaTrader 5 script. Attach it to a chart, enter the entry price, stop-loss price, and risk amount, and it prints:
+A MetaTrader 5 script. Attach it to a chart, enter the entry price, stop-loss price, and risk settings, and it prints:
 
+- selected risk mode
+- calculated risk amount
 - raw lot size
 - rounded lot size
 - estimated risk after rounding
 - symbol tick size / tick value / volume limits
+
+## Risk modes
+
+`RiskLotCalculator.mq5` supports three risk calculation modes:
+
+```text
+RISK_FIXED_MONEY
+RISK_BALANCE_PERCENT
+RISK_EQUITY_PERCENT
+```
+
+### Fixed money mode
+
+Use `InpRiskMoney` directly as the risk amount in account currency.
+
+Example:
+
+```text
+InpRiskMode  = RISK_FIXED_MONEY
+InpRiskMoney = 100.0
+```
+
+### Balance-percent mode
+
+Calculate the risk amount from account balance and `InpRiskPercent`.
+
+Example:
+
+```text
+InpRiskMode    = RISK_BALANCE_PERCENT
+InpRiskPercent = 1.0
+```
+
+### Equity-percent mode
+
+Calculate the risk amount from account equity and `InpRiskPercent`.
+
+Example:
+
+```text
+InpRiskMode    = RISK_EQUITY_PERCENT
+InpRiskPercent = 1.0
+```
 
 ## Formula
 
@@ -56,7 +101,8 @@ MQL5/Scripts/RiskLotCalculator.mq5
 5. Enter:
    - `InpEntryPrice`
    - `InpStopLossPrice`
-   - `InpRiskMoney`
+   - `InpRiskMode`
+   - `InpRiskMoney` for fixed-money mode, or `InpRiskPercent` for percent-risk modes
 
 ## Safety notes
 
@@ -67,7 +113,7 @@ Always confirm the result against your broker's contract specification before li
 ## Roadmap
 
 - [ ] Add optional chart object reading for entry/SL lines.
-- [ ] Add account-balance percentage risk mode.
+- [x] Add account-balance percentage risk mode.
 - [ ] Add multi-symbol examples.
 - [ ] Add CSV export for calculated scenarios.
 - [ ] Add unit-testable formula mirror in Python for validation.
