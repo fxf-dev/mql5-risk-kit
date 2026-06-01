@@ -7,14 +7,23 @@
 //+------------------------------------------------------------------+
 #property strict
 #property script_show_inputs
-#property version   "0.1.0"
-#property description "Calculate MT5 lot size from entry, stop loss, and risk amount."
+#property version   "0.1.1"
+#property description "Calculate MT5 lot size from entry, stop loss, and risk settings."
 
-input string InpSymbol = "";                 // Symbol. Empty = current chart symbol.
-input double InpEntryPrice = 0.0;             // Entry price. 0 = current mid price.
-input double InpStopLossPrice = 0.0;          // Stop-loss price.
-input double InpRiskMoney = 100.0;            // Risk amount in account currency.
-input bool   InpPrintSymbolSpec = true;       // Print tick/volume specification.
+enum ENUM_RISK_MODE
+{
+   RISK_FIXED_MONEY     = 0,  // Fixed money amount
+   RISK_BALANCE_PERCENT = 1,  // Percent of account balance
+   RISK_EQUITY_PERCENT  = 2   // Percent of account equity
+};
+
+input string         InpSymbol = "";                         // Symbol. Empty = current chart symbol.
+input double         InpEntryPrice = 0.0;                     // Entry price. 0 = current mid price.
+input double         InpStopLossPrice = 0.0;                  // Stop-loss price.
+input ENUM_RISK_MODE InpRiskMode = RISK_FIXED_MONEY;          // Risk calculation mode.
+input double         InpRiskMoney = 100.0;                    // Fixed risk amount in account currency.
+input double         InpRiskPercent = 1.0;                    // Risk percent for balance/equity modes.
+input bool           InpPrintSymbolSpec = true;               // Print tick/volume specification.
 
 //+------------------------------------------------------------------+
 bool ReadSymbolDouble(const string symbol,
@@ -28,6 +37,89 @@ bool ReadSymbolDouble(const string symbol,
                   symbol, (int)property, GetLastError());
       return false;
    }
+   return true;
+}
+
+//+------------------------------------------------------------------+
+bool ReadSymbolInteger(const string symbol,
+                       const ENUM_SYMBOL_INFO_INTEGER property,
+                       long &value)
+{
+   ResetLastError();
+   if(!SymbolInfoInteger(symbol, property, value))
+   {
+      PrintFormat("SymbolInfoInteger failed. symbol=%s property=%d error=%d",
+                  symbol, (int)property, GetLastError());
+      return false;
+   }
+   return true;
+}
+
+//+------------------------------------------------------------------+
+string RiskModeToString(const ENUM_RISK_MODE mode)
+{
+   switch(mode)
+   {
+      case RISK_FIXED_MONEY:
+         return "fixed money";
+      case RISK_BALANCE_PERCENT:
+         return "balance percent";
+      case RISK_EQUITY_PERCENT:
+         return "equity percent";
+      default:
+         return "unknown";
+   }
+}
+
+//+------------------------------------------------------------------+
+bool CalculateRiskMoney(double &risk_money)
+{
+   risk_money = 0.0;
+
+   if(InpRiskMode == RISK_FIXED_MONEY)
+   {
+      if(InpRiskMoney <= 0.0)
+      {
+         Print("InpRiskMoney must be greater than 0 in fixed-money mode.");
+         return false;
+      }
+
+      risk_money = InpRiskMoney;
+      return true;
+   }
+
+   if(InpRiskPercent <= 0.0)
+   {
+      Print("InpRiskPercent must be greater than 0 in percent-risk modes.");
+      return false;
+   }
+
+   double base_value = 0.0;
+
+   if(InpRiskMode == RISK_BALANCE_PERCENT)
+      base_value = AccountInfoDouble(ACCOUNT_BALANCE);
+   else if(InpRiskMode == RISK_EQUITY_PERCENT)
+      base_value = AccountInfoDouble(ACCOUNT_EQUITY);
+   else
+   {
+      Print("Unknown risk mode.");
+      return false;
+   }
+
+   if(base_value <= 0.0)
+   {
+      PrintFormat("Invalid account base value for risk calculation: %.2f", base_value);
+      return false;
+   }
+
+   risk_money = base_value * InpRiskPercent / 100.0;
+
+   if(risk_money <= 0.0)
+   {
+      Print("Calculated risk money is invalid.");
+      return false;
+   }
+
    return true;
 }
 
@@ -121,11 +213,15 @@ void OnStart()
       return;
    }
 
-   if(InpRiskMoney <= 0.0)
-   {
-      Print("InpRiskMoney must be greater than 0.");
+   long symbol_digits_long = 0;
+   if(!ReadSymbolInteger(symbol, SYMBOL_DIGITS, symbol_digits_long))
       return;
-   }
+
+   const int symbol_digits = (int)symbol_digits_long;
+
+   double risk_money = 0.0;
+   if(!CalculateRiskMoney(risk_money))
+      return;
 
    double entry = InpEntryPrice;
    if(entry <= 0.0)
@@ -168,16 +264,23 @@ void OnStart()
       return;
    }
 
-   const double raw_lots      = InpRiskMoney / loss_per_1_lot;
+   const double raw_lots      = risk_money / loss_per_1_lot;
    const double rounded_lots  = RoundVolumeDown(symbol, raw_lots);
    const double rounded_risk  = rounded_lots * loss_per_1_lot;
 
    Print("------------------------------------------------------------");
    Print("RiskLotCalculator");
    PrintFormat("symbol=%s", symbol);
-   PrintFormat("entry=%.*f stop_loss=%.*f", _Digits, entry, _Digits, stop_loss);
-   PrintFormat("risk_money=%.2f", InpRiskMoney);
-   PrintFormat("price_distance=%.*f", _Digits, price_distance);
+   PrintFormat("entry=%.*f stop_loss=%.*f", symbol_digits, entry, symbol_digits, stop_loss);
+   PrintFormat("risk_mode=%s", RiskModeToString(InpRiskMode));
+   PrintFormat("risk_money=%.2f", risk_money);
+
+   if(InpRiskMode == RISK_FIXED_MONEY)
+      PrintFormat("input_fixed_risk_money=%.2f", InpRiskMoney);
+   else
+      PrintFormat("input_risk_percent=%.4f", InpRiskPercent);
+
+   PrintFormat("price_distance=%.*f", symbol_digits, price_distance);
    PrintFormat("loss_per_1_lot=%.2f", loss_per_1_lot);
    PrintFormat("raw_lots=%.8f", raw_lots);
    PrintFormat("rounded_lots=%.8f", rounded_lots);
