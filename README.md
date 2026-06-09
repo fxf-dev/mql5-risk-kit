@@ -120,7 +120,7 @@ Always confirm the result against your broker's contract specification before li
 - [ ] Add multi-symbol examples.
 - [ ] Add CSV export for calculated scenarios.
 - [ ] Add unit-testable formula mirror in Python for validation.
-- [ ] Add documentation for metals, indices, FX, and crypto CFDs.
+- [x] Add documentation for metals, indices, FX, and crypto CFDs.
 
 ## Contributing
 
