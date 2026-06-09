@@ -103,7 +103,10 @@ MQL5/Scripts/RiskLotCalculator.mq5
    - `InpStopLossPrice`
    - `InpRiskMode`
    - `InpRiskMoney` for fixed-money mode, or `InpRiskPercent` for percent-risk modes
+## Documentation
 
+- [Symbol specification edge cases](docs/symbol-spec-edge-cases.md)
+  
 ## Safety notes
 
 This script does not place orders. It only calculates volume.
